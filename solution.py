@@ -25,35 +25,48 @@ class SemanticBase() :
        (temp,id) = self.search(gram)
        if temp and temp not in entities.keys() :
           entities[temp]  = id
-    print entities
+    #print entities
     for entity,id in entities.iteritems() :
-      text = (self.topic(id))[0].get('text', None)
-      entitiesObj.append((entity,id,text))
-    print entitiesObj
+      if self.topic(id) :
+        text = (self.topic(id))[0].get('text', None)
+        print entity, text
+        entitiesObj.append((entity,id,text))
+    #print entitiesObj
     #return (entity,meaning)
-   
-  def relation(self) :
-    service_url = 'https://www.googleapis.com/freebase/v1/mqlread'
-    query = [{'id': None, 'name': None, 'type': '/astronomy/planet'}]
-    params = { 'query': json.dumps(query), 'key': self.api_key }
-    url = service_url + '?' + urllib.urlencode(params)
-    response = json.loads(urllib.urlopen(url).read())
-    for planet in response['result']:
-      print planet['name']
+    return entitiesObj
+
+  def relation(self, q1, q2 ) :
+    try:
+      d1 = self.search(q1,complete = True)
+      if d1.get('notable',None) :
+        notable1 = d1.get('notable').get('name',None)
+      d2 = self.search(q2,complete = True)
+      if d2.get('notable',None) :
+        notable2 = d2.get('notable').get('name',None)
+      if notable1 == notable2 :
+        print "q1 and q2 are %s" %(notable1)
+        return      
+    except Exception,e:
+      print e
+      print "Failed to find a relation"
+    print "No relation between %s %s" %(q1,q2)
 
 
-  def search(self,query) :
+  def search(self,query,complete = False) :
     service_url = 'https://www.googleapis.com/freebase/v1/search'
     params = {'query': query,'key': self.api_key}
     url = service_url + '?' + urllib.urlencode(params)
     response = json.loads(urllib.urlopen(url).read())
     entities = []
     for result in response['result']:
-       if result['score'] > 500 :
-         #print result['name'] + ' (' + str(result['score']) + ')'
-         #print result
-         return (result['name'].strip(),result['mid'])
-         break
+       #if result['score'] > 500 :
+       #  print result
+       if complete :
+          return result
+       return (result['name'].strip(),result['mid'])
+ 
+    if complete :
+       return None 
     return (None,None)
 
   def topic(self,topic_id) :
@@ -63,17 +76,51 @@ class SemanticBase() :
     topic = json.loads(urllib.urlopen(url).read())
 
     for property in topic['property']:
-      return topic['property']['/common/topic/notable_for']['values']
+      if topic['property'].get('/common/topic/notable_for',None) :
+        return topic['property']['/common/topic/notable_for']['values']
+      else :
+        return None
       print property + ':'
       for value in topic['property'][property]['values']:
         print ' - ' + value['text']
-         
+ 
+  def readTweets(self) :
+    import MySQLdb
+
+    db = MySQLdb.connect("localhost","root","stream01d","twitter" )
+    cursor = db.cursor()
+    tweets = []
+    try:
+      cursor.execute("SELECT * from tweets")
+      for x in cursor :
+        (id,text,timestamp) = x
+        tweets.append(x)
+        print text
+      db.commit()
+    except:
+      pass
+      db.rollback()
+    db.close()
+    return tweets
+
+  def process(self) :
+    tweets = self.readTweets()
+    for tweet in tweets :
+      id,text,timestamp = tweet
+      text = "Deepika Padukone portrays the titular protagonist, a Bengali architect living in New Delhi, and Amitabh Bachchan plays her hypochondriac father."
+      print self.parse(text)
+      break
+      
+  
 
 if __name__ == "__main__" :
   sem = SemanticBase()
   sentence = "Deepika Padukone portrays the titular protagonist, a Bengali architect living in New Delhi, and Amitabh Bachchan plays her hypochondriac father."
   #sem.ngrams(sentence,2)
-  #sem.search("Deepika Padukone")
-  #sem.topic("/m/02hrh1q")
+  #print sem.search("Deepika Padukone", complete = True)
+  #print sem.search("Yuvraj Singh")
+  #sem.topic("/m/028lkr") # /m/028lkr #/m/02hrh1q
   sem.parse(sentence)
-  
+  #sem.relation("Yuvraj Singh", "Sachin Tendulkar")
+  #sem.readTweets() 
+  #sem.process()
