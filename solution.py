@@ -13,20 +13,34 @@ class SemanticBase() :
     output = []
     for i in range(len(input)-n+1):
       output.append(input[i:i+n])
-    print output
     return output
 
-  # It will give the entites present in the sentence. 
+  # It will give the entites present in the sentence along with their meaning. 
   def parse(self,sentence) :
     bigrams = self.ngrams(sentence,2)
-    trigrams = self.ngrams(sentence,3)
-    entities = []
-    for gram in bigrams+trigrams :
-       temp = self.search(" ".join(gram))
-       for entity in temp  :
-         if entity not in entities :   
-           entities.append(entity)
+    trigrams = self.ngrams(sentence,3) 
+    entities = {}
+    entitiesObj = []
+    for gram in bigrams+trigrams :  # consider unigrams as well.
+       (temp,id) = self.search(gram)
+       if temp and temp not in entities.keys() :
+          entities[temp]  = id
     print entities
+    for entity,id in entities.iteritems() :
+      text = (self.topic(id))[0].get('text', None)
+      entitiesObj.append((entity,id,text))
+    print entitiesObj
+    #return (entity,meaning)
+   
+  def relation(self) :
+    service_url = 'https://www.googleapis.com/freebase/v1/mqlread'
+    query = [{'id': None, 'name': None, 'type': '/astronomy/planet'}]
+    params = { 'query': json.dumps(query), 'key': self.api_key }
+    url = service_url + '?' + urllib.urlencode(params)
+    response = json.loads(urllib.urlopen(url).read())
+    for planet in response['result']:
+      print planet['name']
+
 
   def search(self,query) :
     service_url = 'https://www.googleapis.com/freebase/v1/search'
@@ -36,11 +50,11 @@ class SemanticBase() :
     entities = []
     for result in response['result']:
        if result['score'] > 500 :
-         print result['name'] + ' (' + str(result['score']) + ')'
-         entities.append(result['name'].strip())
-         print result
+         #print result['name'] + ' (' + str(result['score']) + ')'
+         #print result
+         return (result['name'].strip(),result['mid'])
          break
-    return entities
+    return (None,None)
 
   def topic(self,topic_id) :
     service_url = 'https://www.googleapis.com/freebase/v1/topic'
@@ -49,10 +63,11 @@ class SemanticBase() :
     topic = json.loads(urllib.urlopen(url).read())
 
     for property in topic['property']:
+      return topic['property']['/common/topic/notable_for']['values']
       print property + ':'
       for value in topic['property'][property]['values']:
         print ' - ' + value['text']
-  
+         
 
 if __name__ == "__main__" :
   sem = SemanticBase()
