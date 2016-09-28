@@ -87,7 +87,7 @@ class SemanticBase() :
   def readTweets(self) :
     import MySQLdb
 
-    db = MySQLdb.connect("localhost","root","stream01d","twitter" )
+    db = MySQLdb.connect("localhost","root","toor","twitter" )
     cursor = db.cursor()
     tweets = []
     try:
